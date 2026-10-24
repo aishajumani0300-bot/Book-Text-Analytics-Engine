@@ -1,243 +1,183 @@
 
 import java.io.File;
-import java.io.IOException;
+import java.io.FileNotFoundException;
 import java.util.Scanner;
 
 public class BookTextAnalytics {
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
 
-        // STEP 1: Load the book.
-        File file = new File("BookTextAnalytics/alice.txt");
-        Scanner sc = new Scanner(file);
+        // TASK 1: Load and analyze the book.
+        StringBuilder text = new StringBuilder();
 
-        StringBuilder textBuilder = new StringBuilder();
+        try {
+            Scanner sc = new Scanner(
+                new File("BookTextAnalytics/alice.txt"));
 
-        while (sc.hasNextLine()) {
-            textBuilder.append(sc.nextLine()).append(" ");
+            while (sc.hasNextLine()) {
+                text.append(sc.nextLine()).append(" ");
+            }
+
+            sc.close();
+        } catch (FileNotFoundException e) {
+            System.out.println("Book file not found!");
+            return;
         }
 
-        sc.close();
-
-        String text = textBuilder.toString();
+        String book = text.toString().toLowerCase();
 
         System.out.println("Book loaded successfully!");
         System.out.println("Total characters: " + text.length());
 
-        // STEP 2: Convert all text to lowercase.
-        text = text.toLowerCase();
-
+        String cleaned = book.replaceAll("[^a-z0-9\\s]", " ");
         System.out.println("Lowercase text preview:");
-        System.out.println(
-            text.substring(0, Math.min(200, text.length()))
-        );
+        System.out.println(cleaned.substring(
+            0, Math.min(180, cleaned.length())));
 
-        // STEP 3: Replace punctuation with spaces.
-        // Keep letters, digits, and whitespace.
-        text = text.replaceAll("[^a-z0-9\\s]", " ");
+        String[] tokens = cleaned.trim().isEmpty()
+            ? new String[0] : cleaned.trim().split("\\s+");
 
-        // Handle an empty book correctly.
-        String[] words;
-
-        if (text.trim().isEmpty()) {
-            words = new String[0];
-        } else {
-            words = text.trim().split("\\s+");
-        }
-
-        // STEP 4: Store all words in our custom dynamic array.
         DynamicArray bookWords = new DynamicArray();
 
-        for (String word : words) {
-            if (!word.isEmpty()) {
-                bookWords.add(word);
-            }
+        for (int i = 0; i < tokens.length; i++) {
+            bookWords.add(tokens[i]);
         }
 
-        // Total words include duplicates.
-        System.out.println("Total words: " + bookWords.size());
-
-        // STEP 5: Count word frequencies using our custom hash table.
-        WordFrequencyHashTable frequency =
-                new WordFrequencyHashTable();
+        WordFrequencyHashTable frequencies =
+            new WordFrequencyHashTable();
 
         for (int i = 0; i < bookWords.size(); i++) {
-            frequency.increment(bookWords.get(i));
+            frequencies.increment(bookWords.get(i));
         }
 
-        // Each distinct word has one entry in the hash table.
-        System.out.println("Unique words: " + frequency.size());
-
-        // Display selected word frequencies.
+        System.out.println("Total words: " + bookWords.size());
+        System.out.println("Unique words: " + frequencies.size());
         System.out.println("Frequency of alice: "
-                + frequency.get("alice"));
-
+            + frequencies.get("alice"));
         System.out.println("Frequency of rabbit: "
-                + frequency.get("rabbit"));
+            + frequencies.get("rabbit"));
 
-        // STEP 6: Copy entries into an array for sorting.
-        WordFrequency[] sortedWords = frequency.toArray();
+        // Sort frequencies to find the top 10 words.
+        WordFrequency[] top = frequencies.toArray();
 
-        // Sort by frequency from highest to lowest.
-        // Use alphabetical order to break ties.
-        sortWords(sortedWords);
+        for (int i = 0; i < top.length - 1; i++) {
+            int max = i;
 
-        // STEP 7: Display the top 10 words.
-        System.out.println("\nTop 10 most frequent words:");
-
-        for (int i = 0; i < 10 && i < sortedWords.length; i++) {
-            System.out.println(
-                sortedWords[i].word + " : "
-                + sortedWords[i].count
-            );
-        }
-    }
-
-    // Sort the entries using selection sort.
-    static void sortWords(WordFrequency[] words) {
-
-        for (int i = 0; i < words.length - 1; i++) {
-
-            int best = i;
-
-            for (int j = i + 1; j < words.length; j++) {
-
-                // Prefer the word with the higher frequency.
-                if (words[j].count > words[best].count) {
-                    best = j;
-                }
-
-                // If counts are equal, prefer alphabetical order.
-                else if (words[j].count == words[best].count
-                        && words[j].word.compareTo(words[best].word) < 0) {
-                    best = j;
+            for (int j = i + 1; j < top.length; j++) {
+                if (top[j].count > top[max].count) {
+                    max = j;
+                } else if (top[j].count == top[max].count
+                        && top[j].word.compareTo(top[max].word) < 0) {
+                    max = j;
                 }
             }
 
-            // Swap the selected word into its correct position.
-            WordFrequency temp = words[i];
-            words[i] = words[best];
-            words[best] = temp;
+            WordFrequency temp = top[i];
+            top[i] = top[max];
+            top[max] = temp;
         }
+
+        System.out.println("\nTop 10 most frequent words:");
+
+        for (int i = 0; i < Math.min(10, top.length); i++) {
+            System.out.println(top[i].word + " : " + top[i].count);
+        }
+
+        // TASK 2: Count adjacent word transitions.
+        WordTransitionHashTable transitions =
+            new WordTransitionHashTable();
+
+        for (int i = 0; i < bookWords.size() - 1; i++) {
+            transitions.addTransition(
+                bookWords.get(i), bookWords.get(i + 1));
+        }
+
+        System.out.println("\n===== TASK 2: WORD TRANSITIONS =====");
+        System.out.println("Total transitions: "
+            + transitions.getTotalTransitions());
+        System.out.println("Unique transitions: "
+            + transitions.getUniqueTransitions());
+        System.out.println("Transition alice -> was: "
+            + transitions.getTransitionCount("alice", "was"));
+
+        System.out.println("\nWords that follow 'alice':");
+        transitions.printNeighbors("alice");
     }
 }
 
 
-// CUSTOM DYNAMIC ARRAY
-// Stores the book's words and expands when it becomes full.
+// Stores words in a resizable array.
 class DynamicArray {
+    private String[] data = new String[100];
+    private int count = 0;
 
-    private String[] data;
-    private int size;
-    private int capacity;
+    // Adds a word and expands the array when full.
+    void add(String word) {
+        if (count == data.length) {
+            String[] bigger = new String[data.length * 2];
 
-    public DynamicArray() {
-        capacity = 10;
-        size = 0;
-        data = new String[capacity];
-    }
+            for (int i = 0; i < count; i++) {
+                bigger[i] = data[i];
+            }
 
-    // Add a word at the end of the array.
-    public void add(String word) {
-
-        if (size == capacity) {
-            resize();
+            data = bigger;
         }
 
-        data[size] = word;
-        size++;
+        data[count] = word;
+        count++;
     }
 
-    // Double the capacity and copy existing words.
-    private void resize() {
-
-        int newCapacity = capacity * 2;
-        String[] newData = new String[newCapacity];
-
-        for (int i = 0; i < size; i++) {
-            newData[i] = data[i];
-        }
-
-        data = newData;
-        capacity = newCapacity;
-    }
-
-    // Return the number of stored words.
-    public int size() {
-        return size;
-    }
-
-    // Return the word at the requested index.
-    public String get(int index) {
-
-        if (index < 0 || index >= size) {
-            throw new IndexOutOfBoundsException(
-                "Invalid index: " + index
-            );
-        }
-
+    // Returns the word at the given position.
+    String get(int index) {
         return data[index];
     }
+
+    // Returns the number of stored words.
+    int size() {
+        return count;
+    }
 }
 
 
-// STORES ONE WORD AND ITS FREQUENCY
+// Stores a word and its frequency.
 class WordFrequency {
-
     String word;
     int count;
 
-    public WordFrequency(String word, int count) {
+    WordFrequency(String word, int count) {
         this.word = word;
         this.count = count;
     }
 }
 
 
-// CUSTOM HASH TABLE
-// Uses linked lists to handle collisions.
+// Counts word frequencies using a hash table.
 class WordFrequencyHashTable {
-
-    // Each array position is a bucket.
-    private Node[] buckets;
-    private int size;
-
-    private static final double LOAD_FACTOR = 0.75;
-
-    // Each node stores a word, its count, and the next node.
-    private static class Node {
-
+    private class Node {
         String word;
         int count;
         Node next;
 
-        Node(String word, int count, Node next) {
+        Node(String word) {
             this.word = word;
-            this.count = count;
-            this.next = next;
+            count = 1;
         }
     }
 
-    // Start with 16 buckets.
-    public WordFrequencyHashTable() {
-        buckets = new Node[16];
-        size = 0;
-    }
+    private Node[] buckets = new Node[11];
+    private int uniqueWords = 0;
 
-    // Convert a word's hash code into a valid bucket index.
+    // Calculates a valid hash table position.
     private int hash(String word) {
         return Math.floorMod(word.hashCode(), buckets.length);
     }
 
-    // Add a new word or increase its existing frequency.
-    public void increment(String word) {
-
+    // Adds a word or increases its frequency.
+    void increment(String word) {
         int index = hash(word);
         Node current = buckets[index];
 
-        // Search this bucket's linked list for the word.
         while (current != null) {
-
             if (current.word.equals(word)) {
                 current.count++;
                 return;
@@ -246,25 +186,22 @@ class WordFrequencyHashTable {
             current = current.next;
         }
 
-        // Resize if adding another unique word exceeds the limit.
-        if ((size + 1.0) / buckets.length > LOAD_FACTOR) {
-            resize();
-            index = hash(word);
-        }
+        Node newNode = new Node(word);
+        newNode.next = buckets[index];
+        buckets[index] = newNode;
+        uniqueWords++;
 
-        // Insert a new word at the beginning of the bucket.
-        buckets[index] = new Node(word, 1, buckets[index]);
-        size++;
+        if ((double) uniqueWords / buckets.length > 0.75) {
+            resize();
+        }
     }
 
-    // Return the frequency of a word, or zero if not found.
-    public int get(String word) {
-
+    // Returns the frequency of a word.
+    int get(String word) {
         int index = hash(word);
         Node current = buckets[index];
 
         while (current != null) {
-
             if (current.word.equals(word)) {
                 return current.count;
             }
@@ -275,56 +212,198 @@ class WordFrequencyHashTable {
         return 0;
     }
 
-    // Return the number of unique words in the table.
-    public int size() {
-        return size;
+    // Returns the number of unique words.
+    int size() {
+        return uniqueWords;
     }
 
-    // Double the bucket array and redistribute all existing nodes.
+    // Doubles the table size and moves its entries.
     private void resize() {
-
         Node[] oldBuckets = buckets;
-        buckets = new Node[oldBuckets.length * 2];
+        buckets = new Node[oldBuckets.length * 2 + 1];
 
         for (int i = 0; i < oldBuckets.length; i++) {
-
             Node current = oldBuckets[i];
 
             while (current != null) {
+                Node next = current.next;
+                int index = hash(current.word);
 
-                Node nextNode = current.next;
-                int newIndex = hash(current.word);
-
-                // Move the node to its new bucket.
-                current.next = buckets[newIndex];
-                buckets[newIndex] = current;
-
-                current = nextNode;
+                current.next = buckets[index];
+                buckets[index] = current;
+                current = next;
             }
         }
     }
 
-    // Copy all unique words and their counts into an array.
-    public WordFrequency[] toArray() {
-
-        WordFrequency[] result = new WordFrequency[size];
-        int index = 0;
+    // Copies word frequencies into an array.
+    WordFrequency[] toArray() {
+        WordFrequency[] result = new WordFrequency[uniqueWords];
+        int position = 0;
 
         for (int i = 0; i < buckets.length; i++) {
-
             Node current = buckets[i];
 
             while (current != null) {
-
-                result[index] = new WordFrequency(
-                    current.word, current.count
-                );
-
-                index++;
+                result[position] =
+                    new WordFrequency(current.word, current.count);
+                position++;
                 current = current.next;
             }
         }
 
         return result;
+    }
+}
+
+
+// Counts adjacent word pairs using a hash table.
+class WordTransitionHashTable {
+    private class TargetNode {
+        String word;
+        int count;
+        TargetNode next;
+
+        TargetNode(String word) {
+            this.word = word;
+            count = 1;
+        }
+    }
+
+    private class SourceNode {
+        String word;
+        TargetNode neighbors;
+        SourceNode next;
+
+        SourceNode(String word) {
+            this.word = word;
+        }
+    }
+
+    private SourceNode[] buckets = new SourceNode[101];
+    private int sourceCount = 0;
+    private int totalTransitions = 0;
+    private int uniqueTransitions = 0;
+
+    // Calculates the hash table position for a word.
+    private int hash(String word) {
+        return Math.floorMod(word.hashCode(), buckets.length);
+    }
+
+    // Adds a transition or increases its existing count.
+    void addTransition(String source, String target) {
+        totalTransitions++;
+
+        int index = hash(source);
+        SourceNode current = buckets[index];
+
+        while (current != null && !current.word.equals(source)) {
+            current = current.next;
+        }
+
+        if (current == null) {
+            current = new SourceNode(source);
+            current.next = buckets[index];
+            buckets[index] = current;
+            sourceCount++;
+
+            if ((double) sourceCount / buckets.length > 0.75) {
+                resize();
+            }
+        }
+
+        TargetNode neighbor = current.neighbors;
+
+        while (neighbor != null) {
+            if (neighbor.word.equals(target)) {
+                neighbor.count++;
+                return;
+            }
+
+            neighbor = neighbor.next;
+        }
+
+        TargetNode newTarget = new TargetNode(target);
+        newTarget.next = current.neighbors;
+        current.neighbors = newTarget;
+        uniqueTransitions++;
+    }
+
+    // Doubles the table and repositions source words.
+    private void resize() {
+        SourceNode[] oldBuckets = buckets;
+        buckets = new SourceNode[oldBuckets.length * 2 + 1];
+
+        for (int i = 0; i < oldBuckets.length; i++) {
+            SourceNode current = oldBuckets[i];
+
+            while (current != null) {
+                SourceNode next = current.next;
+                int index = hash(current.word);
+
+                current.next = buckets[index];
+                buckets[index] = current;
+                current = next;
+            }
+        }
+    }
+
+    // Returns the total number of adjacent pairs.
+    int getTotalTransitions() {
+        return totalTransitions;
+    }
+
+    // Returns the number of distinct adjacent pairs.
+    int getUniqueTransitions() {
+        return uniqueTransitions;
+    }
+
+    // Returns how often one word follows another.
+    int getTransitionCount(String source, String target) {
+        int index = hash(source);
+        SourceNode current = buckets[index];
+
+        while (current != null) {
+            if (current.word.equals(source)) {
+                TargetNode neighbor = current.neighbors;
+
+                while (neighbor != null) {
+                    if (neighbor.word.equals(target)) {
+                        return neighbor.count;
+                    }
+
+                    neighbor = neighbor.next;
+                }
+
+                return 0;
+            }
+
+            current = current.next;
+        }
+
+        return 0;
+    }
+
+    // Prints every word that follows the given word.
+    void printNeighbors(String source) {
+        int index = hash(source);
+        SourceNode current = buckets[index];
+
+        while (current != null && !current.word.equals(source)) {
+            current = current.next;
+        }
+
+        if (current == null) {
+            System.out.println("No neighbors found.");
+            return;
+        }
+
+        TargetNode neighbor = current.neighbors;
+
+        while (neighbor != null) {
+            System.out.println(source + " -> " + neighbor.word
+                + " : " + neighbor.count);
+            neighbor = neighbor.next;
+        }
     }
 }
